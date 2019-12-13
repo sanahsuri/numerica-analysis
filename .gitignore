@@ -1,0 +1,5 @@
+# Ignoring videos and gifs
+
+*.mp4
+*.gif
+videos/
