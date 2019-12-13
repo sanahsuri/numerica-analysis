@@ -10,8 +10,57 @@ import time
 import mpl_toolkits.mplot3d as p3
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
+from numericalanalysis import
 
 # Implementation of 1D heat equation using Crank-Nicolson method
+
+# forward substitution using lower triangular matrix
+def forward_sub(l, b, x):
+    n = int(math.sqrt(l.size))
+    for i in range(0, n):
+        for j in range(0, i):
+            b[i] = b[i] - l[i][j] * x[j]
+        x[i] = b[i]/l[i][i]
+    return x
+
+# LU factorization
+def lu_fac(m):
+    n = int(math.sqrt(m.size))
+    u = np.zeros(shape = (n, n))
+    for s in range(0, n):
+       for t in range(0, n):
+           u[s][t] = m[s][t]
+
+    l = np.zeros(shape = (n, n))
+    for j in range(0, n):
+        if np.absolute(m[j][j]) == 0:
+            return "error!!"
+        else:
+            for i in range(j+1, n):
+                mult = m[i][j]/m[j][j]
+                if (j < i):
+                    l[i][j] = mult
+                for k in range(j+1, n):
+                    u[i][k] = m[i][k] - (mult * m[j][k])
+    for p in range(0, n):
+        for q in range(0, n):
+          if (q < p):
+              u[p][q] = 0
+          if (p == q):
+              l[p][q] = 1
+    return u, l
+
+def gaus_seidel(m, b, x0, k):
+    n = int(math.sqrt(m.size))
+    u, l = lu_fac(m)
+    for i in range(0, n):
+        for j in range(0, n):
+            if (i == j):
+                u[i][j] = 0
+    for i in range(0, k):
+        y = b - np.dot(u, x0)
+        x0 = forward_sub(l, y, x0)
+    return x0
 
 # [xl, xr] -> space interval
 # [yb, yt] -> time interval
@@ -23,9 +72,9 @@ from matplotlib import cm
 # r -> boundary condition
 # Awj = Bwj-1 + sigma(sj-1 + sj)
 def crank_nicolson(xl, xr, yb, yt, M, N, D, f, l, r):
-    h = (xr-xl)/M
-    k = (yt-yb)/N
-    sigma = D*k/(h*h)
+    dx = (xr-xl)/M
+    dt = (yt-yb)/N
+    sigma = D*dt/(dx*dx)
     m = M-1
     n = N
     a = 2 * np.diag(np.ones(m)) + 2 * sigma * np.diag(np.ones(m)) + (-1 * sigma) * np.diag(np.ones(m-1), 1) + (-1 * sigma) * np.diag(np.ones(m-1), -1)
@@ -33,29 +82,25 @@ def crank_nicolson(xl, xr, yb, yt, M, N, D, f, l, r):
     lside = np.zeros(n+1, )
     rside = np.zeros(n+1, )
     for i in range(0, n+1):
-        lside[i] = l(yb + i*k)
-        rside[i] = r(yb + i*k)
-    w = np.zeros((m, n+1))
+        lside[i] = l(yb + i*dt)
+        rside[i] = r(yb + i*dt)
+    sol = np.zeros((m, n+1))
     for i in range(0, m):
-        w[i][0] = f(xl + (i+1)*h)
+        sol[i][0] = f(xl + (i+1)*dx)
     for j in range(1, n+1):
         sides = np.zeros(m)
         sides[0] = lside[j-1] + lside[j]
         sides[m-1] = rside[j-1] + rside[j]
-        r = np.matmul(b, (w[:, j-1])) + sigma*sides
-        w[:, j] = np.linalg.solve(a, r)
-        #temp = np.vstack((w, rside))
-        #temp = np.vstack((lside, temp))
-        #sns.heatmap(temp)
-        #plt.show()
-    w = np.vstack((w, rside))
-    w = np.vstack((lside, w))
-    return w;
+        r = np.matmul(b, (sol[:, j-1])) + sigma*sides
+        sol[:, j] = np.linalg.solve(a, r)
+    sol = np.vstack((sol, rside))
+    sol = np.vstack((lside, sol))
+    return sol;
 
 def crank_nicolson_anim(xl, xr, yb, yt, M, N, D, f, l, r, zarray):
-    h = (xr-xl)/M
-    k = (yt-yb)/N
-    sigma = D*k/(h*h)
+    dx = (xr-xl)/M
+    dt = (yt-yb)/N
+    sigma = D*dt/(dx*dx)
     m = M-1
     n = N
     a = 2 * np.diag(np.ones(m)) + 2 * sigma * np.diag(np.ones(m)) + (-1 * sigma) * np.diag(np.ones(m-1), 1) + (-1 * sigma) * np.diag(np.ones(m-1), -1)
@@ -63,18 +108,18 @@ def crank_nicolson_anim(xl, xr, yb, yt, M, N, D, f, l, r, zarray):
     lside = np.zeros(n+1, )
     rside = np.zeros(n+1, )
     for i in range(0, n+1):
-        lside[i] = l(yb + i*k)
-        rside[i] = r(yb + i*k)
-    w = np.zeros((m, n+1))
+        lside[i] = l(yb + i*dt)
+        rside[i] = r(yb + i*dt)
+    sol = np.zeros((m, n+1))
     for i in range(0, m):
-        w[i][0] = f(xl + (i+1)*h)
+        sol[i][0] = f(xl + (i+1)*dx)
     for j in range(1, n+1):
         sides = np.zeros(m)
         sides[0] = lside[j-1] + lside[j]
         sides[m-1] = rside[j-1] + rside[j]
-        r = np.matmul(b, (w[:, j-1])) + sigma*sides
-        w[:, j] = np.linalg.solve(a, r)
-        temp = np.vstack((w, rside))
+        r = np.matmul(b, (sol[:, j-1])) + sigma*sides
+        sol[:, j] = np.linalg.solve(a, r)
+        temp = np.vstack((sol, rside))
         temp = np.vstack((lside, temp))
         zarray[:,:,j] = temp
     return zarray;
